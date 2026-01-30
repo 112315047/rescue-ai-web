@@ -1,4 +1,3 @@
-import 'regenerator-runtime/runtime';
 import React, { useEffect, useState } from 'react';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { Button } from '@/components/ui/button';

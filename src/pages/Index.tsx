@@ -17,6 +17,15 @@ import { cn } from '@/lib/utils';
 
 const Index = () => {
   const [language, setLanguage] = useState<SupportedLanguage>('en');
+  useEffect(() => {
+    // Basic diagnostic for Vercel deployment
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+      toast.error("Supabase configuration missing. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to your Vercel Environment Variables.", {
+        duration: 10000,
+      });
+    }
+  }, []);
+
   const [location, setLocation] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [caseId, setCaseId] = useState<string | null>(null);
