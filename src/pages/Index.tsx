@@ -11,9 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Shield, Loader2 } from 'lucide-react';
+import { MapPin, Shield, Loader2, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 
 const Index = () => {
   const [language, setLanguage] = useState<SupportedLanguage>('en');
@@ -35,6 +36,7 @@ const Index = () => {
   const [lastGeocodedLocation, setLastGeocodedLocation] = useState<string>('');
   const [locationSource, setLocationSource] = useState<'gps' | 'manual' | 'fallback' | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { isEnabled: isVoiceEnabled, toggle: toggleVoice, speak } = useVoiceAssistant();
 
   const t = UI_TRANSLATIONS[language];
 
@@ -43,7 +45,13 @@ const Index = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+
+    // Voice feedback for assistant messages
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.sender === 'assistant' && isVoiceEnabled) {
+      speak(lastMessage.content, language);
+    }
+  }, [messages, isVoiceEnabled, speak, language]);
 
   // Automatically request location on mount
   useEffect(() => {
@@ -467,6 +475,18 @@ const Index = () => {
                     {isLocating ? '...' : (location || 'Pending')}
                   </span>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleVoice}
+                  className={cn(
+                    "h-8 w-8 rounded-full",
+                    isVoiceEnabled ? "text-primary" : "text-muted-foreground"
+                  )}
+                  title={isVoiceEnabled ? "Mute Bot" : "Unmute Bot"}
+                >
+                  {isVoiceEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                </Button>
                 <LanguageSelector value={language} onChange={setLanguage} />
               </div>
             </CardHeader>
