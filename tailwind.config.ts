@@ -47,6 +47,27 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        priority: {
+          p1: "hsl(var(--priority-p1))",
+          "p1-foreground": "hsl(var(--priority-p1-foreground))",
+          p2: "hsl(var(--priority-p2))",
+          "p2-foreground": "hsl(var(--priority-p2-foreground))",
+          p3: "hsl(var(--priority-p3))",
+          "p3-foreground": "hsl(var(--priority-p3-foreground))",
+          p4: "hsl(var(--priority-p4))",
+          "p4-foreground": "hsl(var(--priority-p4-foreground))",
+        },
+        status: {
+          active: "hsl(var(--status-active))",
+          assigned: "hsl(var(--status-assigned))",
+          resolved: "hsl(var(--status-resolved))",
+        },
+        chat: {
+          user: "hsl(var(--chat-user))",
+          "user-foreground": "hsl(var(--chat-user-foreground))",
+          assistant: "hsl(var(--chat-assistant))",
+          "assistant-foreground": "hsl(var(--chat-assistant-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -65,20 +86,12 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
