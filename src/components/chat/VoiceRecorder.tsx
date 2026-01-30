@@ -30,33 +30,57 @@ export function VoiceRecorder({ onTranscription, disabled, language }: VoiceReco
     isMicrophoneAvailable
   } = useSpeechRecognition();
 
+  // Debugging logs for Vercel
+  useEffect(() => {
+    console.log('VoiceRecorder State:', { 
+      browserSupportsSpeechRecognition, 
+      isMicrophoneAvailable, 
+      listening,
+      language,
+      mappedLanguage: languageMap[language]
+    });
+  }, [browserSupportsSpeechRecognition, isMicrophoneAvailable, listening, language]);
+
   // Update transcription as it comes in
   useEffect(() => {
     if (listening && transcript) {
+      console.log('Transcript update:', transcript);
       onTranscription(transcript);
     }
   }, [transcript, listening, onTranscription]);
 
   if (!browserSupportsSpeechRecognition) {
+    console.warn('Speech recognition not supported in this browser.');
     return null; // Don't show the button if not supported
   }
 
-  const toggleRecording = () => {
-    if (listening) {
-      SpeechRecognition.stopListening();
-      toast.success("Voice recognized");
-    } else {
-      if (!isMicrophoneAvailable) {
-        toast.error("Microphone access is required");
-        return;
+  const toggleRecording = async () => {
+    try {
+      if (listening) {
+        console.log('Stopping speech recognition...');
+        await SpeechRecognition.stopListening();
+        toast.success("Voice recognized");
+      } else {
+        console.log('Starting speech recognition...', { 
+          language: languageMap[language], 
+          isMicrophoneAvailable 
+        });
+        
+        if (!isMicrophoneAvailable) {
+          toast.error("Microphone access is required");
+          return;
+        }
+        
+        resetTranscript();
+        await SpeechRecognition.startListening({ 
+          continuous: true, 
+          language: languageMap[language] || 'en-US' 
+        });
+        toast.info("Listening... Tap again to stop.");
       }
-      
-      resetTranscript();
-      SpeechRecognition.startListening({ 
-        continuous: true, 
-        language: languageMap[language] || 'en-US' 
-      });
-      toast.info("Listening... Tap again to stop.");
+    } catch (error) {
+      console.error('Speech Recognition Error:', error);
+      toast.error("Could not start voice recognition.");
     }
   };
 
