@@ -104,16 +104,18 @@ const Index = () => {
     console.log('Geocoding location string:', locStr);
     
     const tryGeocode = async (query: string) => {
+      // Append ", India" if not already present to narrow down results
+      const searchQuery = query.toLowerCase().includes('india') ? query : `${query}, India`;
       try {
         const resp = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`
         );
         const data = await resp.json();
         if (data && data.length > 0) {
           return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
         }
       } catch (err) {
-        console.error(`Geocoding failed for query: ${query}`, err);
+        console.error(`Geocoding failed for query: ${searchQuery}`, err);
       }
       return null;
     };
@@ -127,22 +129,12 @@ const Index = () => {
       
       // Strategy 1: First 2 parts (more specific landmark/road)
       if (parts.length >= 2) {
-        const simpleQuery = `${parts[0]}, ${parts[1]}`;
-        console.log('Retrying with simple query:', simpleQuery);
-        result = await tryGeocode(simpleQuery);
+        result = await tryGeocode(`${parts[0]}, ${parts[1]}`);
       }
       
       // Strategy 2: First part only
       if (!result && parts.length > 0) {
-        console.log('Retrying with first part only:', parts[0]);
         result = await tryGeocode(parts[0]);
-      }
-
-      // Strategy 3: End of address (might be city/state only)
-      if (!result && parts.length > 1) {
-        const endQuery = parts.slice(-2).join(', ');
-        console.log('Retrying with end of address:', endQuery);
-        result = await tryGeocode(endQuery);
       }
     }
 
