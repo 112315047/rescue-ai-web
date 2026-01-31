@@ -94,9 +94,6 @@ const Index = () => {
       (error) => {
         console.error('Geolocation error:', error);
         toast.error('Location access denied. Please enter it manually.');
-        // Default to central Nagpur area as fallback
-        setCoords({ lat: 21.1458, lng: 79.0882 });
-        setLocationSource('fallback');
         setIsLocating(false);
       }
     );
@@ -121,38 +118,31 @@ const Index = () => {
       return null;
     };
 
-    // Try different slices of the address to find a match
+    // Try original first
     let result = await tryGeocode(locStr);
     
+    // Unbiased retry logic if original fails
     if (!result && locStr.includes(',')) {
       const parts = locStr.split(',').map(p => p.trim());
       
-      // Strategy 1: First 2 parts + "Nagpur, India" (Specific landmark in the city)
-      if (parts.length > 3) {
-        const specificQuery = `${parts[0]}, ${parts[1]}, Nagpur, India`;
-        console.log('Retrying with landmark query:', specificQuery);
-        result = await tryGeocode(specificQuery);
-      }
-      
-      // Strategy 2: First part + "Nagpur, India"
-      if (!result && parts.length > 2) {
-        const simpleQuery = `${parts[0]}, Nagpur, India`;
-        console.log('Retrying with simple landmark query:', simpleQuery);
+      // Strategy 1: First 2 parts (more specific landmark/road)
+      if (parts.length >= 2) {
+        const simpleQuery = `${parts[0]}, ${parts[1]}`;
+        console.log('Retrying with simple query:', simpleQuery);
         result = await tryGeocode(simpleQuery);
       }
-
-      // Strategy 3: Just the first 2 parts (Road codes/landmarks)
-      if (!result && parts.length >= 2) {
-        const roadQuery = `${parts[0]} ${parts[1]}`;
-        console.log('Retrying with road/landmark query:', roadQuery);
-        result = await tryGeocode(roadQuery);
+      
+      // Strategy 2: First part only
+      if (!result && parts.length > 0) {
+        console.log('Retrying with first part only:', parts[0]);
+        result = await tryGeocode(parts[0]);
       }
 
-      // Strategy 4: Fallback to wider area (last 3 parts)
-      if (!result && parts.length > 2) {
-        const widerQuery = parts.slice(-3).join(',').trim();
-        console.log('Retrying with wider area query:', widerQuery);
-        result = await tryGeocode(widerQuery);
+      // Strategy 3: End of address (might be city/state only)
+      if (!result && parts.length > 1) {
+        const endQuery = parts.slice(-2).join(', ');
+        console.log('Retrying with end of address:', endQuery);
+        result = await tryGeocode(endQuery);
       }
     }
 
@@ -220,10 +210,11 @@ const Index = () => {
 
       // Create a new case if none exists
       if (!currentCaseId) {
-        // Fallback if no location yet
-        if (!currentCoords) {
-          currentCoords = { lat: 21.1458, lng: 79.0882 };
-          setLocationSource('fallback');
+        // No location? Notify the user instead of guessing Nagpur
+        if (!currentCoords && !location) {
+          toast.warning("Please provide a location for the emergency.");
+          setIsLoading(false);
+          return;
         }
 
         const payload: any = {

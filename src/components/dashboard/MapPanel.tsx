@@ -50,11 +50,8 @@ const getCoords = (c: Case): [number, number] => {
     return [lat + latJitter, lng + lngJitter];
   }
 
-  // Absolute fallback: Nagpur area with jitter
-  const hash = c.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const lat = 21.1458 + (hash % 100) / 500 - 0.1;
-  const lng = 79.0882 + ((hash * 17) % 100) / 500 - 0.1;
-  return [lat, lng];
+  // Absolute fallback: null (do not show marker if no location is known)
+  return null;
 };
 
 function ChangeView({ center, animate }: { center: [number, number]; animate: boolean }) {
@@ -75,9 +72,8 @@ export const MapPanel: React.FC<MapPanelProps> = ({ cases, selectedCaseId, onCas
   const activeCases = cases.filter(c => c.status !== 'resolved');
   const selectedCase = cases.find(c => c.id === selectedCaseId);
   
-  const center: [number, number] = selectedCase 
-    ? getCoords(selectedCase) 
-    : [20.5937, 78.9629];
+  const coordsFound = selectedCase ? getCoords(selectedCase) : null;
+  const center: [number, number] = coordsFound || [20.5937, 78.9629];
 
   console.log(`MapPanel: Rendering ${activeCases.length} active cases`);
 
@@ -126,6 +122,8 @@ export const MapPanel: React.FC<MapPanelProps> = ({ cases, selectedCaseId, onCas
 
           {activeCases.map((c) => {
             const coords = getCoords(c);
+            if (!coords) return null; // Skip cases with no coordinates
+
             const isSelected = c.id === selectedCaseId;
             const isP1 = c.priority === 'P1';
             const color = isP1 ? '#ef4444' : c.priority === 'P2' ? '#f97316' : c.priority === 'P3' ? '#facc15' : '#22c55e';
