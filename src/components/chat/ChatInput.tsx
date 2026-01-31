@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Loader2 } from 'lucide-react';
 import { VoiceRecorder } from './VoiceRecorder';
+import { FirstAidGuides } from './FirstAidGuides';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -27,22 +28,33 @@ export function ChatInput({ onSend, placeholder, disabled, language }: ChatInput
   }, []);
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
-      <VoiceRecorder
-        onTranscription={handleVoiceTranscription}
-        disabled={disabled}
-        language={language}
-      />
-      <Input
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        placeholder={placeholder}
-        disabled={disabled}
-        className="flex-1"
-      />
-      <Button type="submit" disabled={!message.trim() || disabled} className="shrink-0">
-        {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-      </Button>
+    <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+      <div className="flex gap-1 items-center shrink-0">
+        <VoiceRecorder
+          onTranscription={handleVoiceTranscription}
+          disabled={disabled}
+          language={language}
+        />
+        <FirstAidGuides language={language} />
+      </div>
+      <div className="relative flex-1">
+        <Input
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="pr-12 bg-background/50 border-muted-foreground/20 focus:bg-background transition-all"
+        />
+        <Button 
+          type="submit" 
+          size="icon"
+          variant="ghost" 
+          disabled={!message.trim() || disabled}
+          className="absolute right-1 top-1 h-8 w-8 text-primary hover:bg-primary/10 transition-colors"
+        >
+          {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </Button>
+      </div>
     </form>
   );
 }
