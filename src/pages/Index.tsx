@@ -210,28 +210,29 @@ const Index = () => {
 
       // Create a new case if none exists
       if (!currentCaseId) {
-        // No location? Notify the user instead of guessing Nagpur
+        // No location and no coords? Block submission.
         if (!currentCoords && !location) {
           toast.warning("Please provide a location for the emergency.");
           setIsLoading(false);
           return;
         }
 
+        console.log('Preparing case creation. Coords:', currentCoords, 'Location:', location);
+
         const payload: any = {
           language,
           location: location || 'Unknown',
           status: 'active' as any,
-          triage_data: { coords: currentCoords }, // Legacy storage
+          triage_data: currentCoords ? { coords: currentCoords } : null,
         };
 
-        // Add new columns only if they are likely to exist
-        // or let Supabase ignore them if we can't be sure.
-        // To be safe and fulfill "you only add it", we include them
-        // but we'll catch the error if the table hasn't been altered yet.
+        if (currentCoords) {
+          payload.latitude = currentCoords.lat;
+          payload.longitude = currentCoords.lng;
+        }
+        
         payload.location_text = location || 'Location not specified';
-        payload.latitude = currentCoords.lat;
-        payload.longitude = currentCoords.lng;
-        payload.location_source = locationSource || 'fallback';
+        payload.location_source = locationSource || (currentCoords ? 'manual' : 'unknown');
 
         console.log('Creating new case with payload:', payload);
 

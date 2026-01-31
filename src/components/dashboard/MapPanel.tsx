@@ -122,6 +122,7 @@ export const MapPanel: React.FC<MapPanelProps> = ({ cases, selectedCaseId, onCas
 
           {activeCases.map((c) => {
             const coords = getCoords(c);
+            console.log(`MapPanel: Case ${c.id} coords:`, coords, 'Full case:', c);
             if (!coords) return null; // Skip cases with no coordinates
 
             const isSelected = c.id === selectedCaseId;
