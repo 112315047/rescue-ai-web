@@ -34,7 +34,7 @@ RakshAI acts as a **digital first responder** that:
 ## ✨ Core Features
 
 ### 🧑‍🤝‍🧑 Citizen Emergency Chat
-- Multilingual chat (English, Hindi, Telugu, Tamil)
+- Multilingual chat (English, Hindi, Telugu, Tamil, Marathi)
 - Emergency quick buttons (Fire, Flood, Accident, Trapped, Food/Water)
 - WhatsApp-style chat interface
 - Location input (text-based)
@@ -82,14 +82,66 @@ Each user message is analyzed to produce:
 
 | Layer | Technology |
 |-----|-----------|
-| Frontend | Next.js (React) |
-| Backend | Next.js API Routes (Node.js) |
+| Frontend | React (Vite) + TypeScript |
+| UI Framework | TailwindCSS + Shadcn UI |
+| Backend | Django REST Framework (Python) |
 | Database | Supabase (PostgreSQL) |
 | Realtime | Supabase Realtime |
-| Storage | Supabase Storage |
-| AI | OpenAI API (Gemini fallback) |
-| Speech-to-Text | Whisper API |
-| Hosting | Vercel |
+| AI (Chat) | Lovable AI (Google Gemini / GPT-4) |
+| AI (Voice) | OpenAI Whisper (via Edge Function) |
+| Maps | Leaflet |
+| Hosting | Vercel (Frontend) + *Self-Hosted/Cloud Run* (Backend) |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js (v18 or higher)
+- Python 3.10+
+- npm or yarn
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/aidlink-ai.git
+   cd aidlink-ai
+   ```
+
+2. **Frontend Setup**
+   ```bash
+   npm install
+   ```
+
+3. **Backend Setup**
+   Open a new terminal:
+   ```bash
+   cd backend
+   python -m venv venv
+   # Windows:
+   venv\Scripts\activate
+   # Mac/Linux:
+   # source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+4. **Environment Variables**
+   - **Frontend**: Create `.env` in root with `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+   - **Backend**: Create `.env` in `backend/` with `SUPABASE_URL`, `SUPABASE_KEY`.
+
+5. **Run the Application**
+
+   **Terminal 1 (Backend):**
+   ```bash
+   cd backend
+   python manage.py runserver
+   ```
+
+   **Terminal 2 (Frontend):**
+   ```bash
+   npm run dev
+   ```
 
 ---
 
@@ -101,13 +153,11 @@ Each user message is analyzed to produce:
 |------|------|-------------|
 | id | uuid (PK) | Unique case ID |
 | created_at | timestamp | Case creation time |
-| status | text | open / resolved |
+| status | text | active / resolved / assigned |
 | language | text | User language |
 | location | text | User-provided location |
 | category | text | medical / fire / flood / shelter / food / water |
-| priority | text | P1 / P2 / P3 / P4 |
 | urgency_score | integer | 0–100 urgency level |
-| escalation_needed | boolean | Requires human escalation |
 | assigned_to | text | Assigned responder |
 
 ---

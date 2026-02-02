@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Inbox, LayoutDashboard, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import * as api from '@/services/api';
 
 const Dashboard = () => {
   const [cases, setCases] = useState<Case[]>([]);
@@ -24,6 +25,8 @@ const Dashboard = () => {
     fetchCases();
 
     // Subscribe to real-time updates
+    // NOTE: Keeping Supabase Realtime for immediate dashboard updates as a progressive enhancement.
+    // If strict API-only is required, this block can be removed and we rely on polling/manual refresh.
     const channel = supabase
       .channel('cases-realtime')
       .on(
@@ -61,19 +64,15 @@ const Dashboard = () => {
 
   const fetchCases = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('cases')
-      .select('*')
-      .order('urgency_score', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching cases:', error);
-    } else {
-      console.log('Dashboard: Fetched cases:', data?.length);
-      setCases(data || []);
+    try {
+        const data = await api.getCases();
+        console.log('Dashboard: Fetched cases:', data?.length);
+        setCases(data || []);
+    } catch (error) {
+        console.error('Error fetching cases:', error);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   const filteredCases = cases.filter((c) => {

@@ -36,6 +36,7 @@ export interface Case {
   location_source: 'gps' | 'manual' | 'fallback' | null;
   created_at: string;
   updated_at: string;
+  messages?: Message[];
 }
 
 export interface Message {

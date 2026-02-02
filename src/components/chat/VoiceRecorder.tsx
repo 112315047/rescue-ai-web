@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { transcribeAudio } from '@/services/api';
 
 interface VoiceRecorderProps {
   onTranscription: (text: string) => void;
@@ -12,104 +12,88 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onTranscription, disabled, language }: VoiceRecorderProps) {
-  const [isManualListening, setIsManualListening] = useState(false);
-  
-  // Map language codes to BCP 47 tags
-  const languageMap: Record<string, string> = {
-    ta: 'ta-IN',
-    mr: 'mr-IN'
-  };
+  const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  const {
-    transcript,
-    listening,
-    resetTranscript,
-    browserSupportsSpeechRecognition,
-    isMicrophoneAvailable
-  } = useSpeechRecognition();
-
-  // Sync manual state with hook state occasionally, but let manual override for toggle
-  useEffect(() => {
-    if (listening) setIsManualListening(true);
-    else setIsManualListening(false);
-  }, [listening]);
-
-  // Debugging logs for Vercel
-  useEffect(() => {
-    console.log('VoiceRecorder Engine Status:', { 
-      browserSupportsSpeechRecognition, 
-      isMicrophoneAvailable, 
-      listening,
-      isManualListening,
-      language
-    });
-  }, [browserSupportsSpeechRecognition, isMicrophoneAvailable, listening, isManualListening, language]);
-
-  // Update transcription as it comes in
-  useEffect(() => {
-    if (transcript) {
-      console.log('Transcript received:', transcript);
-      onTranscription(transcript);
-    }
-  }, [transcript, onTranscription]);
-
-  if (!browserSupportsSpeechRecognition) {
-    console.warn('Speech recognition not supported in this browser.');
-    return null;
-  }
-
-  const toggleRecording = async () => {
+  const startRecording = async () => {
     try {
-      if (isManualListening || listening) {
-        console.log('Forcing stop...');
-        await SpeechRecognition.stopListening();
-        setIsManualListening(false);
-        toast.success("Stopped listening");
-      } else {
-        console.log('Requesting start...');
-        
-        if (!isMicrophoneAvailable) {
-          toast.error("Microphone access is required");
-          return;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      chunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        setIsProcessing(true);
+        try {
+          const text = await transcribeAudio(audioBlob, language);
+          onTranscription(text);
+          toast.success("Transcription complete");
+        } catch (error) {
+          console.error("Transcription failed", error);
+          toast.error("Failed to transcribe audio");
+        } finally {
+          setIsProcessing(false);
         }
         
-        resetTranscript();
-        setIsManualListening(true);
-        
-        await SpeechRecognition.startListening({ 
-          continuous: true, 
-          language: languageMap[language] || 'en-US' 
-        });
-        toast.info("Listening... Tap again to stop.");
-      }
-    } catch (error) {
-      console.error('Speech Recognition Error:', error);
-      setIsManualListening(false);
-      toast.error("Voice recognition failed to start.");
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      toast.info("Recording... Tap to stop.");
+    } catch (err) {
+      console.error("Error accessing microphone", err);
+      toast.error("Could not access microphone");
     }
   };
 
-  const active = isManualListening || listening;
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const active = isRecording || isProcessing;
 
   return (
     <Button
       type="button"
-      variant={active ? 'destructive' : 'outline'}
+      variant={isRecording ? 'destructive' : 'outline'}
       size="icon"
       onClick={toggleRecording}
-      disabled={disabled}
+      disabled={disabled || isProcessing}
       className={cn(
         'shrink-0 transition-all duration-200',
-        active && 'animate-pulse ring-2 ring-destructive ring-offset-2'
+        isRecording && 'animate-pulse ring-2 ring-destructive ring-offset-2'
       )}
-      title={active ? "Stop recording" : "Start voice recording"}
+      title={isRecording ? "Stop recording" : "Start voice recording"}
     >
-      {active ? (
+      {isProcessing ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : isRecording ? (
         <MicOff className="h-4 w-4" />
       ) : (
         <Mic className="h-4 w-4" />
       )}
-      <span className="sr-only">{active ? 'Stop' : 'Start'}</span>
+      <span className="sr-only">{isRecording ? 'Stop' : 'Start'}</span>
     </Button>
   );
 }

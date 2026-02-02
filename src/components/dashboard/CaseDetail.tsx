@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { MapPin, User, AlertTriangle, Clock, CheckCircle, RotateCcw, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import * as api from '@/services/api';
 
 interface CaseDetailProps {
   caseData: Case;
@@ -27,6 +28,7 @@ export function CaseDetail({ caseData, onUpdate }: CaseDetailProps) {
     fetchMessages();
 
     // Subscribe to new messages
+    // NOTE: Keeping Supabase Realtime for live chat updates.
     const channel = supabase
       .channel(`messages-${caseData.id}`)
       .on(
@@ -50,18 +52,16 @@ export function CaseDetail({ caseData, onUpdate }: CaseDetailProps) {
 
   const fetchMessages = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .eq('case_id', caseData.id)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching messages:', error);
-    } else {
-      setMessages(data || []);
+    try {
+        // Fetch full case with messages
+        const fullCase = await api.getCase(caseData.id);
+        // Assuming serializer returns 'messages' field
+        setMessages(fullCase.messages || []);
+    } catch (error) {
+        console.error('Error fetching messages:', error);
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleAssign = async () => {
@@ -71,35 +71,35 @@ export function CaseDetail({ caseData, onUpdate }: CaseDetailProps) {
     }
 
     setUpdating(true);
-    const { error } = await supabase
-      .from('cases')
-      .update({ assigned_to: assignee.trim(), status: 'assigned' })
-      .eq('id', caseData.id);
-
-    if (error) {
-      toast.error('Failed to assign case');
-    } else {
-      toast.success('Case assigned successfully');
-      setAssignee('');
-      onUpdate();
+    try {
+        await api.assignCase(caseData.id, assignee.trim());
+        toast.success('Case assigned successfully');
+        setAssignee('');
+        onUpdate();
+    } catch (error) {
+        console.error("Assign error", error);
+        toast.error('Failed to assign case');
+    } finally {
+        setUpdating(false);
     }
-    setUpdating(false);
   };
 
   const handleStatusChange = async (newStatus: 'resolved' | 'active') => {
     setUpdating(true);
-    const { error } = await supabase
-      .from('cases')
-      .update({ status: newStatus })
-      .eq('id', caseData.id);
-
-    if (error) {
-      toast.error('Failed to update status');
-    } else {
-      toast.success(`Case ${newStatus === 'resolved' ? 'resolved' : 'reopened'}`);
-      onUpdate();
+    try {
+        if (newStatus === 'resolved') {
+            await api.resolveCase(caseData.id);
+        } else {
+            await api.updateCase(caseData.id, { status: 'active' });
+        }
+        toast.success(`Case ${newStatus === 'resolved' ? 'resolved' : 'reopened'}`);
+        onUpdate();
+    } catch (error) {
+        console.error("Status update error", error);
+        toast.error('Failed to update status');
+    } finally {
+        setUpdating(false);
     }
-    setUpdating(false);
   };
 
   return (

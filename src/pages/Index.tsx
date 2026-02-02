@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Case, Message, SupportedLanguage, UI_TRANSLATIONS } from '@/lib/types';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -15,17 +14,11 @@ import { MapPin, Shield, Loader2, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
+import * as api from '@/services/api';
 
 const Index = () => {
   const [language, setLanguage] = useState<SupportedLanguage>('en');
-  useEffect(() => {
-    // Basic diagnostic for Vercel deployment
-    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
-      toast.error("Supabase configuration missing. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to your Vercel Environment Variables.", {
-        duration: 10000,
-      });
-    }
-  }, []);
+  // Diagnostics removed as we are moving away from direct Supabase requirement for chat
 
   const [location, setLocation] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -157,35 +150,8 @@ const Index = () => {
     return null;
   };
 
-  // Subscribe to new messages for the current case
-  useEffect(() => {
-    if (!caseId) return;
-
-    const channel = supabase
-      .channel(`citizen-messages-${caseId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `case_id=eq.${caseId}`,
-        },
-        (payload) => {
-          const newMessage = payload.new as Message;
-          setMessages((prev) => {
-            // Avoid duplicates
-            if (prev.some((m) => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [caseId]);
+  // NOTE: Realtime subscription removed to rely on API response for immediate feedback.
+  // Ideally, for multi-device support, we would keep Supabase realtime or implement websockets in Django.
 
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -218,135 +184,54 @@ const Index = () => {
 
         console.log('Preparing case creation. Coords:', currentCoords, 'Location:', location);
 
-        const payload: any = {
-          language,
-          location: location || 'Unknown',
-          status: 'active' as any,
-          triage_data: currentCoords ? { coords: currentCoords } : null,
-        };
-
-        if (currentCoords) {
-          payload.latitude = currentCoords.lat;
-          payload.longitude = currentCoords.lng;
+        try {
+            const newCase = await api.createCase(
+                language,
+                location || 'Unknown',
+                currentCoords?.lat,
+                currentCoords?.lng
+            );
+            currentCaseId = newCase.id;
+            setCaseId(currentCaseId);
+        } catch (err: any) {
+             console.error('Case creation failed', err);
+             toast.error('Failed to start a new case. Please check your connection.');
+             setIsLoading(false);
+             return;
         }
-        
-        payload.location_text = location || 'Location not specified';
-        payload.location_source = locationSource || (currentCoords ? 'manual' : 'unknown');
-
-        console.log('Creating new case with payload:', payload);
-
-        let { data: newCase, error: caseError } = await supabase
-          .from('cases')
-          .insert(payload)
-          .select()
-          .single();
-
-        // Fallback if migration hasn't been run yet (missing columns)
-        if (caseError) {
-          console.warn('Initial case creation failed. Retrying with safe fallback payload...', caseError);
-          const safePayload = {
-            language,
-            location: location || 'Unknown',
-            status: 'active' as any,
-            triage_data: { coords: currentCoords },
-          };
-          
-          const { data: fallbackCase, error: fallbackError } = await supabase
-            .from('cases')
-            .insert(safePayload)
-            .select()
-            .single();
-            
-          if (fallbackError) throw fallbackError;
-          newCase = fallbackCase;
-        }
-
-        currentCaseId = newCase!.id;
-        setCaseId(currentCaseId);
       }
 
-      // Insert user message
-      const { data: userMessage, error: msgError } = await supabase
-        .from('messages')
-        .insert({
-          case_id: currentCaseId,
+      // Optimistic user message (local only, real ID will come from backend, but we need to display it)
+      const optimisticMessage: Message = {
+          id: 'temp-' + Date.now(),
+          case_id: currentCaseId!,
           sender: 'user',
+          content: content,
+          created_at: new Date().toISOString()
+      };
+      
+      setMessages((prev) => [...prev, optimisticMessage]);
+
+      // Call API
+      const response = await api.addMessage(
+          currentCaseId!,
           content,
-        })
-        .select()
-        .single();
-
-      if (msgError) throw msgError;
-
-      // Add to local state immediately for responsiveness
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === userMessage.id)) return prev;
-        return [...prev, userMessage];
-      });
-
-      // Get all messages for context
-      const allMessages = [...messages, userMessage];
-
-      // Call triage API
-      console.log(`Triage API call for case ${currentCaseId}:`, {
-        message: content,
-        location,
-        coords: currentCoords
-      });
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/triage`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            caseId: currentCaseId,
-            message: content,
-            language,
-            location: location || undefined,
-            coords: currentCoords || undefined,
-            latitude: currentCoords?.lat || 21.1458,
-            longitude: currentCoords?.lng || 79.0882,
-            location_source: locationSource || 'fallback',
-            conversationHistory: allMessages.map((m) => ({
-              role: m.sender === 'user' ? 'user' : 'assistant',
-              content: m.content,
-            })),
-          }),
-        }
+          location,
+          currentCoords?.lat,
+          currentCoords?.lng
       );
+      
+      // Update with AI response
+      const aiMessage: Message = {
+          id: response.message_id || 'ai-' + Date.now(),
+          case_id: currentCaseId!,
+          sender: 'assistant',
+          content: response.reply,
+          created_at: new Date().toISOString()
+      };
+      
+      setMessages((prev) => [...prev, aiMessage]);
 
-      if (!response.ok) {
-        console.error('Triage edge function failed. Executing manual fallback...', response.status);
-        
-        // Manual Fallback: Still insert a reassuring message so the user isn't left hanging
-        const fallbackReply = "Your report has been received and recorded. A responder has been notified and will be with you shortly. Please stay calm and safe.";
-        
-        await supabase
-          .from('messages')
-          .insert({
-            case_id: currentCaseId,
-            sender: 'assistant',
-            content: fallbackReply,
-          });
-
-        // Also update case to at least be active/P4 if not already
-        await supabase
-          .from('cases')
-          .update({ status: 'active' as any, priority: 'P4' as any })
-          .eq('id', currentCaseId);
-
-        setIsLoading(false);
-        return;
-      }
-
-      const data = await response.json();
-
-      // The assistant message is already inserted by the edge function
-      // and will arrive via realtime subscription
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message. Please try again.');
